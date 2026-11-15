@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Security Alerts{% endblock %}
+{% block content %}
+<div class="eyebrow">Login Monitoring</div>
+<h1 class="page-title">Security Alerts</h1>
+<p class="page-sub">Every login triggers a "Was this you?" email to the account holder. Delivery status is logged here even if SMTP isn't configured.</p>
+
+<div class="card">
+  <div class="section-title">Alert History ({{ alerts|length }})</div>
+  {% if alerts %}
+  <table>
+    <thead><tr><th>Time</th><th>Account</th><th>IP Address</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for a in alerts %}
+      <tr>
+        <td class="dim">{{ a.timestamp }}</td>
+        <td>{{ a.username }}</td>
+        <td class="dim">{{ a.ip_address }}</td>
+        <td>
+          {% if a.delivered %}
+          <span class="badge normal">emailed</span>
+          {% else %}
+          <span class="badge dos">not delivered</span>
+          {% endif %}
+        </td>
+        <td class="dim" style="font-family: var(--sans); font-size:12px;">{{ a.detail }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="dim" style="font-size:13px;">No logins yet.</p>
+  {% endif %}
+</div>
+
+{% if not smtp_configured %}
+<div class="card" style="margin-top:16px;">
+  <div class="section-title">📧 Enable Real Email Alerts</div>
+  <p class="dim" style="font-size:13px; line-height:1.7;">
+    Set these environment variables before running <span class="mono">python app.py</span> to send real emails via SMTP (e.g. Gmail with an App Password):
+  </p>
+  <pre class="envelope">export SMTP_HOST=smtp.gmail.com
+export SMTP_PORT=587
+export SMTP_USERNAME=youraddress@gmail.com
+export SMTP_PASSWORD=your16charapppassword</pre>
+</div>
+{% endif %}
+{% endblock %}

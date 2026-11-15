@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CloudGuard{% endblock %} — Integrated Cloud Security Framework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="topbar">
+    <a href="{{ url_for('dashboard') if current_user else url_for('login') }}" class="brand">
+      <span class="dot"></span> CLOUDGUARD // ICSF
+    </a>
+    {% if current_user %}
+    <nav>
+      <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">Dashboard</a>
+      <a href="{{ url_for('vault') }}" class="{{ 'active' if request.endpoint == 'vault' }}">Family Vault</a>
+      <a href="{{ url_for('threat_detection') }}" class="{{ 'active' if request.endpoint == 'threat_detection' }}">Threat Detection</a>
+      <a href="{{ url_for('security_alerts') }}" class="{{ 'active' if request.endpoint == 'security_alerts' }}">Security Alerts</a>
+      <a href="{{ url_for('account') }}" class="{{ 'active' if request.endpoint == 'account' }}">{{ current_user.full_name }}</a>
+      <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+    {% endif %}
+  </div>
+  <div class="wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

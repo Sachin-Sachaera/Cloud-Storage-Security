@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div style="max-width: 420px; margin: 60px auto;">
+  <div class="eyebrow" style="text-align:center;">Family Access</div>
+  <h1 class="page-title" style="text-align:center;">Sign in to CloudGuard</h1>
+  <p class="page-sub" style="text-align:center;">Family administrator login. A "was this you?" alert is emailed on every sign-in.</p>
+
+  <div class="card">
+    <form method="post">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" name="username" required autofocus style="width:100%;">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" required style="width:100%;">
+      </div>
+      <button class="btn" type="submit" style="width:100%;">Sign In</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="section-title" style="margin-bottom:8px;">Demo Accounts</div>
+    <p class="dim" style="font-size:12.5px; line-height:1.7;">
+      <span class="mono">appa_admin</span> · <span class="mono">amma_admin</span> · <span class="mono">anna_admin</span><br>
+      Default password for all three: <span class="mono">Family@123</span><br>
+      Change your password and alert email from Account after logging in.
+    </p>
+  </div>
+</div>
+{% endblock %}

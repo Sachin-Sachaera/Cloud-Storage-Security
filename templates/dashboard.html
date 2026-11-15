@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="eyebrow">System Overview</div>
+<h1 class="page-title">Welcome, {{ current_user.full_name }}</h1>
+<p class="page-sub">Integrated Cloud Security Framework — cryptography, document safety scanning, and network threat detection for the family.</p>
+
+<div class="grid cols-4" style="margin-bottom: 22px;">
+  <div class="card stat-card">
+    <div class="stat-label">Files Secured</div>
+    <div class="stat-value accent">{{ total_files }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-label">Unsafe Files Caught</div>
+    <div class="stat-value danger">{{ unsafe_files }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-label">Traffic Scans</div>
+    <div class="stat-value">{{ total_scans }}</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-label">Threats Flagged</div>
+    <div class="stat-value danger">{{ threat_count }}</div>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <div class="section-title">🔐 Security Pipeline</div>
+    <div class="flow-diagram">
+      <div class="flow-step">Upload</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Safety Scan (heuristics + ML)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">AES-256-GCM</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">RSA-2048 Wrap + Sign</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Vault</div>
+    </div>
+    <div class="flow-diagram">
+      <div class="flow-step">Login</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Session Created</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">"Was this you?" Email</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Security Alerts Log</div>
+    </div>
+    <form action="{{ url_for('retrain') }}" method="post" style="margin-top:18px;">
+      <button class="btn secondary" type="submit">Retrain Both ML Models</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🔔 Recent Login Alerts</div>
+    {% if recent_alerts %}
+    <table>
+      <thead><tr><th>Time</th><th>Account</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for a in recent_alerts %}
+        <tr>
+          <td class="dim">{{ a.timestamp.split(' ')[1] }}</td>
+          <td>{{ a.username }}</td>
+          <td>
+            {% if a.delivered %}<span class="badge normal">emailed</span>
+            {% else %}<span class="badge dos">local only</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <a href="{{ url_for('security_alerts') }}" class="dim" style="font-size:12px;">View full alert history →</a>
+    {% else %}
+    <p class="dim" style="font-size:13px;">No logins recorded yet this session.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:18px;">
+  {% if metrics %}
+  <div class="card">
+    <div class="section-title">📊 Network Threat Model</div>
+    <div class="stat-value accent" style="font-size:26px;">{{ "%.1f"|format(metrics.accuracy * 100) }}%</div>
+    <div class="dim" style="font-size:12px;">test accuracy · {{ metrics.n_train }} train / {{ metrics.n_test }} test samples</div>
+    <div class="pill-row">
+      {% for cls in metrics.classes %}
+      <span class="pill">{{ cls }}: {{ "%.0f"|format(metrics.classification_report[cls]['f1-score'] * 100) }}% F1</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if file_metrics %}
+  <div class="card">
+    <div class="section-title">📄 Document Risk Model</div>
+    <div class="stat-value accent" style="font-size:26px;">{{ "%.1f"|format(file_metrics.accuracy * 100) }}%</div>
+    <div class="dim" style="font-size:12px;">test accuracy on synthetic file-metadata dataset</div>
+    <div class="pill-row">
+      {% for cls in file_metrics.classes %}
+      <span class="pill">{{ cls }}: {{ "%.0f"|format(file_metrics.classification_report[cls]['f1-score'] * 100) }}% F1</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

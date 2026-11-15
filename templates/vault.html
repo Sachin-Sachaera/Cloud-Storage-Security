@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+{% block title %}Family Vault{% endblock %}
+{% block content %}
+<div class="eyebrow">Cryptography + Document Safety</div>
+<h1 class="page-title">Encrypted Family Vault</h1>
+<p class="page-sub">Every upload is scanned for threats first (signature check, macro detection, entropy, ML risk model), then encrypted with AES-256-GCM + RSA-2048 if safe to store.</p>
+
+<div class="card" style="margin-bottom: 22px;">
+  <div class="section-title">Upload, Scan &amp; Encrypt</div>
+  <form id="vaultUploadForm" class="inline" action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" required>
+    <button class="btn" type="submit">Scan &amp; Store</button>
+  </form>
+  <div class="pill-row">
+    <span class="pill">Signature vs extension check</span>
+    <span class="pill">Macro detection</span>
+    <span class="pill">Entropy analysis</span>
+    <span class="pill">ML risk scoring</span>
+    <span class="pill">AES-256-GCM + RSA-2048</span>
+  </div>
+</div>
+
+<!-- Upload progress dialog (0 to 100) -->
+
+<div id="uploadProgressModal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="uploadProgressTitle">
+    <div class="modal-header">
+      <div>
+        <div class="eyebrow" style="margin:0 0 6px 0;">Document Pipeline</div>
+        <div id="uploadProgressTitle" class="section-title" style="margin:0;">Scanning: <span id="uploadProgressStatus">starting</span></div>
+      </div>
+      <button type="button" class="modal-close" onclick="hideUploadProgressModal()" aria-label="Close">X</button>
+
+    </div>
+
+    <div class="modal-body">
+      <div class="progress-row">
+        <div class="progress-track"><div id="uploadProgressBar" class="progress-fill" style="width:0%;"></div></div>
+        <div id="uploadProgressPct" class="progress-pct">0%</div>
+      </div>
+      <div class="dim" style="font-size:12.5px; margin-top:10px; font-family: var(--mono);" id="uploadProgressHint">
+        Uploading file, scanning and encrypting...
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <div id="uploadProgressDone" class="badge normal" style="display:none;">scanning completed - file uploaded successfully</div>
+      <div id="uploadProgressBlocked" class="badge dos" style="display:none;">scan blocked - file not stored</div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Scan report modal -->
+<div id="scanReportModal" class="modal" aria-hidden="true">
+  <div class="modal-backdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="scanReportTitle" style="max-width:720px;">
+    <div class="modal-header">
+      <div>
+        <div class="eyebrow" style="margin:0 0 6px 0;">Scan Report</div>
+        <div id="scanReportTitle" class="section-title" style="margin:0;">Document Scan Result</div>
+      </div>
+      <button type="button" class="modal-close" onclick="document.getElementById('scanReportModal').style.display='none';" aria-label="Close">X</button>
+    </div>
+    <div class="modal-body" style="padding-top:10px;">
+      <pre id="scanReportBody" style="white-space:pre-wrap; word-break:break-word; margin:0; background:#060a0d; border:1px solid var(--panel-border); border-radius:8px; padding:14px; font-family: var(--mono); color: var(--accent); font-size:12.5px;"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div id="deleteConfirmModal" class="modal" aria-hidden="true">
+
+  <div class="modal-backdrop"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle" style="max-width:520px;">
+    <div class="modal-header">
+      <div>
+        <div class="eyebrow" style="margin:0 0 6px 0;">Confirm Delete</div>
+        <div id="deleteConfirmTitle" class="section-title" style="margin:0;">Delete this file?</div>
+      </div>
+      <button type="button" class="modal-close" onclick="hideDeleteConfirmModal()" aria-label="Close">X</button>
+    </div>
+    <div class="modal-body" style="padding-top:10px;">
+      <div class="dim" style="font-size:13.5px; line-height:1.5;">
+        Choose <b>Delete</b> to remove the encrypted file from the vault, or <b>Cancel</b> to stop.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="deleteConfirmNo" type="button" class="btn secondary" style="padding:10px 16px;">Cancel</button>
+      <button id="deleteConfirmYes" type="button" class="btn" style="padding:10px 16px; margin-left:10px;">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const formEl = document.getElementById('vaultUploadForm');
+  const modalEl = document.getElementById('uploadProgressModal');
+  const barEl = document.getElementById('uploadProgressBar');
+  const pctEl = document.getElementById('uploadProgressPct');
+  const statusEl = document.getElementById('uploadProgressStatus');
+  const hintEl = document.getElementById('uploadProgressHint');
+  const doneEl = document.getElementById('uploadProgressDone');
+  const blockedEl = document.getElementById('uploadProgressBlocked');
+
+  let progressTimer = null;
+  let progressValue = 0;
+
+  function showUploadProgressModal() {
+    if (!modalEl) return;
+    modalEl.style.display = 'block';
+    modalEl.setAttribute('aria-hidden', 'false');
+    doneEl && (doneEl.style.display = 'none');
+    blockedEl && (blockedEl.style.display = 'none');
+    progressValue = 0;
+    setProgress(0);
+    startFakeProgress();
+  }
+
+  function hideUploadProgressModal() {
+    if (!modalEl) return;
+    modalEl.style.display = 'none';
+    modalEl.setAttribute('aria-hidden', 'true');
+    stopFakeProgress();
+  }
+
+  function stopFakeProgress() {
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  }
+
+  function setProgress(v) {
+    const clamped = Math.max(0, Math.min(100, v));
+    progressValue = clamped;
+    if (barEl) barEl.style.width = clamped + '%';
+    if (pctEl) pctEl.textContent = clamped + '%';
+  }
+
+  function startFakeProgress() {
+    stopFakeProgress();
+    statusEl.textContent = 'uploading';
+    hintEl.textContent = 'Uploading file, scanning and encrypting...';
+
+    // Simulate pipeline steps; actual backend work completes before redirect.
+    // Progress asymptotically approaches 92% to avoid jumping to 100 before redirect completes.
+    const stepA = [0, 22, 45, 70, 82, 90, 92];
+    let idx = 0;
+
+    setProgress(0);
+
+    progressTimer = setInterval(() => {
+      // Move gradually between milestones
+      if (progressValue < stepA[idx]) {
+        setProgress(progressValue + (Math.random() * 3.5 + 1));
+        return;
+      }
+      idx++;
+      if (idx >= stepA.length) {
+        statusEl.textContent = 'finalizing';
+        setProgress(92);
+        return;
+      }
+
+      const milestone = stepA[idx];
+      if (milestone <= 22) statusEl.textContent = 'uploading';
+      else if (milestone <= 45) statusEl.textContent = 'safety scan';
+      else if (milestone <= 70) statusEl.textContent = 'ML risk scoring';
+      else if (milestone <= 82) statusEl.textContent = 'encrypting';
+      else if (milestone <= 90) statusEl.textContent = 'signing & storing';
+    }, 120);
+  }
+
+  // Start modal on submit
+  if (formEl) {
+    formEl.addEventListener('submit', () => {
+      showUploadProgressModal();
+    });
+  }
+
+  // On redirect back to /vault, mark 100% based on flashed results.
+  window.addEventListener('load', () => {
+    if (!modalEl) return;
+
+
+    const flashes = Array.from(document.querySelectorAll('.flash'));
+    const hasError = flashes.some(el => el.classList.contains('error'));
+    const hasSuccess = flashes.some(el => el.classList.contains('success'));
+
+    showUploadProgressModal();
+
+    function getScanDialogText() {
+      const err = flashes.find(el => el.classList.contains('error'));
+      const ok = flashes.find(el => el.classList.contains('success'));
+      const text = (err ? err.textContent : (ok ? ok.textContent : ''));
+
+      const reasonsEl = document.querySelector('.flash.error');
+      const reasonsText = reasonsEl ? reasonsEl.textContent.trim() : '';
+
+      if (reasonsText && reasonsText.toLowerCase().includes('reasons:')) {
+        return reasonsText;
+      }
+      return text || 'Scan completed.';
+    }
+
+    function showScanDialog() {
+      try {
+        const msg = getScanDialogText();
+        doneEl && (doneEl.style.display = 'none');
+        blockedEl && (blockedEl.style.display = 'none');
+
+        statusEl.textContent = 'scan completed';
+        hintEl.textContent = msg;
+        setProgress(100);
+        stopFakeProgress();
+        modalEl.style.display = 'block';
+        modalEl.setAttribute('aria-hidden', 'false');
+
+        window.setTimeout(() => {
+          hideUploadProgressModal();
+        }, 1800);
+      } catch (e) {}
+    }
+
+    if (hasError) {
+      doneEl && (doneEl.style.display = 'none');
+      blockedEl && (blockedEl.style.display = 'inline-block');
+      statusEl.textContent = 'scan completed';
+      setProgress(100);
+      stopFakeProgress();
+      showScanDialog();
+      return;
+    }
+
+    if (hasSuccess) {
+      blockedEl && (blockedEl.style.display = 'none');
+      doneEl && (doneEl.style.display = 'inline-block');
+      statusEl.textContent = 'scan completed';
+      hintEl.textContent = 'File scanned and stored successfully.';
+      setProgress(100);
+      stopFakeProgress();
+      showScanDialog();
+      return;
+    }
+
+    hideUploadProgressModal();
+  });
+
+  // Delete modal logic
+  let deleteTargetId = null;
+
+  function showDeleteConfirmModal(fileId) {
+    deleteTargetId = fileId;
+    const dlg = document.getElementById('deleteConfirmModal');
+    if (!dlg) return;
+
+    dlg.style.display = 'block';
+    dlg.setAttribute('aria-hidden', 'false');
+
+    const backdrop = document.querySelector('#deleteConfirmModal .modal-backdrop');
+    if (backdrop) backdrop.style.display = 'block';
+  }
+
+  function hideDeleteConfirmModal() {
+    const dlg = document.getElementById('deleteConfirmModal');
+    if (!dlg) return;
+    dlg.style.display = 'none';
+    dlg.setAttribute('aria-hidden', 'true');
+  }
+
+  function deleteFile(fileId) {
+    showDeleteConfirmModal(fileId);
+  }
+
+  window.openScanReport = function openScanReport(fileId) {
+    const dlg = document.getElementById('scanReportModal');
+    const body = document.getElementById('scanReportBody');
+    if (!dlg || !body) return;
+
+    body.textContent = 'Loading scan report...';
+    dlg.style.display = 'block';
+    dlg.setAttribute('aria-hidden', 'false');
+
+    fetch(`/vault/inspect/${encodeURIComponent(fileId)}`)
+      .then(r => r.json())
+      .then(res => {
+        // Show only scan summary (A) requested.
+        if (res && res.scan) {
+          const scan = res.scan;
+          const reasons = (scan.reasons || []).join(' · ');
+          body.textContent = `Verdict: ${scan.verdict || ''}\nHeuristic verdict: ${scan.heuristic_verdict || ''}\nML verdict: ${scan.ml_verdict || ''}\n\nReasons: ${reasons || 'None'}`;
+        } else {
+          body.textContent = JSON.stringify(res, null, 2);
+        }
+      })
+      .catch(() => {
+        body.textContent = 'Failed to load scan report.';
+      });
+  };
+
+  window.addEventListener('load', () => {
+    const yesBtn = document.getElementById('deleteConfirmYes');
+
+    const noBtn = document.getElementById('deleteConfirmNo');
+
+    if (yesBtn) {
+      yesBtn.onclick = () => {
+        const idToDelete = deleteTargetId;
+        hideDeleteConfirmModal();
+
+        fetch(`/vault/delete/${encodeURIComponent(idToDelete)}`, { method: 'POST' })
+          .then(r => r.json())
+          .then(res => {
+            if (res && res.deleted) {
+              window.location.reload();
+            }
+          })
+          .catch(() => {});
+      };
+    }
+
+    if (noBtn) {
+      noBtn.onclick = () => {
+        hideDeleteConfirmModal();
+      };
+    }
+  });
+
+</script>
+
+<div class="card">
+  <div class="section-title">Family Files ({{ files|length }})</div>
+  {% if files %}
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Uploaded By</th><th>Verdict</th><th>Size</th><th>Uploaded</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for f in files %}
+      <tr>
+        <td>{{ f.original_name }}</td>
+        <td class="dim">{{ f.uploaded_by }}</td>
+        <td><span class="badge {{ 'normal' if f.scan.verdict == 'safe' else 'dos' }}">{{ f.scan.verdict }}</span></td>
+        <td class="dim">{{ f.size_bytes }} B</td>
+        <td class="dim">{{ f.timestamp }}</td>
+        <td>
+          {% if f.stored %}
+          <a class="btn secondary" style="padding:5px 10px; font-size:11px;" href="{{ url_for('download_file', file_id=f.file_id) }}">Decrypt &amp; Download</a>
+          {% endif %}
+          <a class="btn secondary" style="padding:5px 10px; font-size:11px;" href="#" onclick="openScanReport('{{ f.file_id }}'); return false;">Scan Report</a>
+
+          {% if f.stored %}
+            <a class="btn secondary" style="padding:5px 10px; font-size:11px; margin-left:6px;" href="#" onclick="deleteFile('{{ f.file_id }}'); return false;">Delete</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% if f.scan.verdict != 'safe' %}
+      <tr>
+        <td colspan="6" style="padding-top:0;">
+          <div class="flash error" style="margin:0 0 8px 0;">
+            {% if not f.stored %}BLOCKED - not stored in vault.{% endif %}
+
+            Reasons: {{ f.scan.reasons | join(' · ') }}
+          </div>
+        </td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="dim" style="font-size:13px;">No files uploaded yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
+

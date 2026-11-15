@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Threat Detection{% endblock %}
+{% block content %}
+<div class="eyebrow">Machine Learning Module</div>
+<h1 class="page-title">Real-Time Threat Detection</h1>
+<p class="page-sub">Enter (or randomly sample) connection/traffic features. A RandomForest classifier trained on labeled traffic scores it as normal or one of three attack categories.</p>
+
+<div class="grid cols-2">
+  <div class="card">
+    <div class="section-title">Traffic Record <button type="button" class="btn secondary" style="float:right; padding:5px 10px; font-size:11px;" onclick="fillRandom()">🎲 Random Sample</button></div>
+    <form id="scanForm" class="inline" action="{{ url_for('scan_traffic') }}" method="post" style="display:block;">
+      <div class="grid cols-3">
+        <div class="field">
+          <label>Duration (s)</label>
+          <input type="number" step="0.01" name="duration" id="duration" value="0.5">
+        </div>
+        <div class="field">
+          <label>Protocol</label>
+          <select name="protocol_type" id="protocol_type">
+            <option value="tcp">tcp</option><option value="udp">udp</option><option value="icmp">icmp</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Service</label>
+          <select name="service" id="service">
+            <option>http</option><option>ftp</option><option>smtp</option><option>ssh</option><option>dns</option><option>telnet</option><option>private</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Flag</label>
+          <select name="flag" id="flag">
+            <option>SF</option><option>S0</option><option>REJ</option><option>RSTR</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Src Bytes</label>
+          <input type="number" step="1" name="src_bytes" id="src_bytes" value="300">
+        </div>
+        <div class="field">
+          <label>Dst Bytes</label>
+          <input type="number" step="1" name="dst_bytes" id="dst_bytes" value="500">
+        </div>
+        <div class="field">
+          <label>Count</label>
+          <input type="number" step="1" name="count" id="count" value="4">
+        </div>
+        <div class="field">
+          <label>Srv Count</label>
+          <input type="number" step="1" name="srv_count" id="srv_count" value="4">
+        </div>
+        <div class="field">
+          <label>Failed Logins</label>
+          <input type="number" step="1" name="num_failed_logins" id="num_failed_logins" value="0">
+        </div>
+        <div class="field">
+          <label>SError Rate</label>
+          <input type="number" step="0.01" name="serror_rate" id="serror_rate" value="0.0">
+        </div>
+        <div class="field">
+          <label>RError Rate</label>
+          <input type="number" step="0.01" name="rerror_rate" id="rerror_rate" value="0.0">
+        </div>
+        <div class="field">
+          <label>Same Srv Rate</label>
+          <input type="number" step="0.01" name="same_srv_rate" id="same_srv_rate" value="0.9">
+        </div>
+        <div class="field">
+          <label>Diff Srv Rate</label>
+          <input type="number" step="0.01" name="diff_srv_rate" id="diff_srv_rate" value="0.05">
+        </div>
+      </div>
+      <button class="btn" type="submit">Scan Traffic</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Detection History</div>
+    {% if history %}
+    <table>
+      <thead><tr><th>Time</th><th>Result</th><th>Conf.</th></tr></thead>
+      <tbody>
+      {% for h in history %}
+        <tr>
+          <td class="dim">{{ h.timestamp.split(' ')[1] }}</td>
+          <td><span class="badge {{ h.prediction }}">{{ h.prediction }}</span></td>
+          <td>{{ h.confidence }}%</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="dim" style="font-size:13px;">No scans yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function fillRandom() {
+  fetch("{{ url_for('random_sample') }}")
+    .then(r => r.json())
+    .then(d => {
+      for (const key in d) {
+        const el = document.getElementById(key);
+        if (el) el.value = d[key];
+      }
+    });
+}
+</script>
+{% endblock %}
