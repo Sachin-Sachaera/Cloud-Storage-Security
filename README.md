@@ -1,4 +1,4 @@
-# Cloud-Security
+# Cloud-Storage-Security
 ### Using Cryptography and Machine-Learning-Based Threat Detection
 
 A working Flask application for a college project, combining:
@@ -19,7 +19,7 @@ A working Flask application for a college project, combining:
 ## 1. Setup
 
 ```bash
-cd cloud_security_project
+cd cloud_security
 pip install -r requirements.txt
 python app.py
 ```
