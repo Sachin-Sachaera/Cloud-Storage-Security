@@ -19,7 +19,7 @@ A working Flask application for a college project, combining:
 ## 1. Setup
 
 ```bash
-cd cloud_security
+cd cloud-Storage-Security
 pip install -r requirements.txt
 python app.py
 ```
